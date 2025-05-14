@@ -607,8 +607,8 @@
           <input type="text" id="reparto" name="reparto" required>
         </div>
 
-        <div class="form-row">
-          <label class="form-label" for="sottoscritto">IL SOTTOSCRITTO</label>
+      <div class="form-row">
+          <label class="form-label" for="sottoscritto">IL/LA SOTTOSCRITTO/A</label>
           <input type="text" id="sottoscritto" name="sottoscritto" required>
         </div>
 
@@ -1245,8 +1245,8 @@
                   y += rowPadding;
 
                   // --- Riga Sottoscritto ---
-                  pdf.setFont('helvetica', 'normal').setFontSize(sottoscrittoFontSize).setTextColor(0, 0, 0);
-                  pdf.text('IL SOTTOSCRITTO:', marginLeft, y, { baseline: 'top' }); // Etichetta a sinistra
+                 pdf.setFont('helvetica', 'normal').setFontSize(sottoscrittoFontSize).setTextColor(0, 0, 0);
+                  pdf.text('IL/LA SOTTOSCRITTO/A:', marginLeft, y, { baseline: 'top' }); // Etichetta a sinistra
                   pdf.setFont('helvetica', 'bold').setFontSize(sottoscrittoFontSize).setTextColor(0, 0, 0); // Valore in grassetto
                   pdf.text(document.getElementById('sottoscritto').value || '-', pageWidth / 2, y, { align: 'center', baseline: 'top' }); // Valore centrato
                   y += rowPadding + 1; // Leggermente più spazio dopo questa riga
