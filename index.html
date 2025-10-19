@@ -575,7 +575,8 @@
 
       button { width: auto; } /* Bottone non più a larghezza piena */
     }
-  </style>
+  .signature-mode-selector{display:flex;justify-content:center;margin-bottom:15px;border:1px solid #ccc;border-radius:5px;overflow:hidden}.signature-mode-selector button{flex-grow:1;padding:10px;border:none;background:#f0f0f0;cursor:pointer;transition:background .2s}.signature-mode-selector button:not(:last-child){border-right:1px solid #ccc}.signature-mode-selector button.active{background:#003366;color:white}#signature-text-input{width:100%;height:250px;font-size:2.5em;text-align:center;border:1px dashed #ccc;border-radius:5px;font-family:Helvetica,Arial,sans-serif;box-sizing:border-box}#signature-input-area{margin-bottom:15px}.signature-text-display{width:100%;height:150px;display:flex;align-items:center;justify-content:center;font-size:1.5em;font-family:Helvetica,Arial,sans-serif;color:#333;cursor:pointer;border:1px solid #ddd;border-radius:5px;background:#f9f9f9}
+</style>
 </head>
 <body>
   <div class="container">
@@ -866,18 +867,25 @@
 
   <!-- Template per la finestra modale di firma -->
   <div id="signature-modal" class="signature-modal hidden">
-    <div class="signature-modal-content">
-      <div class="signature-modal-header" id="signature-modal-title">Firma</div>
-      <canvas id="signature-modal-pad" class="signature-modal-pad"></canvas>
-      <div class="signature-modal-buttons">
-        <button class="signature-modal-button signature-modal-upload" id="signature-modal-upload">Carica Immagine</button>
-        <button class="signature-modal-button signature-modal-save" id="signature-modal-save">Salva Firma</button>
-        <button class="signature-modal-button signature-modal-clear" id="signature-modal-clear">Cancella</button>
-        <button class="signature-modal-button signature-modal-cancel" id="signature-modal-cancel">Annulla</button>
-      </div>
-      <input type="file" id="signature-file-input" accept="image/*" style="display: none;">
+  <div class="signature-modal-content">
+    <div class="signature-modal-header" id="signature-modal-title">Firma</div>
+    <div class="signature-mode-selector">
+      <button id="mode-draw-btn" class="active">Disegna</button>
+      <button id="mode-type-btn">Digita</button>
     </div>
+    <div id="signature-input-area">
+      <canvas id="signature-modal-pad" class="signature-modal-pad"></canvas>
+      <input type="text" id="signature-text-input" placeholder="Digita nome e cognome" style="display: none;"/>
+    </div>
+    <div class="signature-modal-buttons">
+      <button class="signature-modal-button signature-modal-upload" id="signature-modal-upload">Carica Immagine</button>
+      <button class="signature-modal-button signature-modal-save" id="signature-modal-save">Salva Firma</button>
+      <button class="signature-modal-button signature-modal-clear" id="signature-modal-clear">Cancella</button>
+      <button class="signature-modal-button signature-modal-cancel" id="signature-modal-cancel">Annulla</button>
+    </div>
+    <input type="file" id="signature-file-input" accept="image/*" style="display: none">
   </div>
+</div>
 
   <script>
     // --- INIZIO COSTANTI BASE64 PER LOGHI ---
@@ -924,7 +932,11 @@
       } else { console.error("Elemento canvas per la firma non trovato!"); }
 
       var currentSignatureType = null;
+const modeDrawBtn=document.getElementById('mode-draw-btn');const modeTypeBtn=document.getElementById('mode-type-btn');const signaturePadEl=document.getElementById('signature-modal-pad');const signatureTextInput=document.getElementById('signature-text-input');if(modeDrawBtn&&modeTypeBtn&&signaturePadEl&&signatureTextInput){modeDrawBtn.addEventListener('click',function(){signatureInputMode='draw';signaturePadEl.style.display='block';signatureTextInput.style.display='none';modeDrawBtn.classList.add('active');modeTypeBtn.classList.remove('active');if(typeof resizeModalCanvas==='function')resizeModalCanvas()});modeTypeBtn.addEventListener('click',function(){signatureInputMode='type';signaturePadEl.style.display='none';signatureTextInput.style.display='block';modeTypeBtn.classList.add('active');modeDrawBtn.classList.remove('active')})}
       var imageUploaded = false;
+var firmaDipendenteText = null;
+var firmaFunzionarioText = null;
+var signatureInputMode = 'draw';
 
       // Funzione per ottimizzare un'immagine di firma
       function optimizeSignatureImage(signatureDataUrl) {
@@ -990,44 +1002,63 @@
 
       // Funzioni per aprire/chiudere/salvare/aggiornare firma
       function openSignatureModal(type) {
-        if (!signaturePad || !signatureModalPadElement) { alert("Errore: pannello firma non pronto."); return; }
-        currentSignatureType = type; signaturePad.clear();
-        signatureModalTitle.textContent = type === 'dipendente' ? 'Firma del dipendente' : 'Firma del funzionario';
+        if (!signaturePad || !signatureModalPadElement) { alert("Errore: il pannello della firma non è pronto."); return; }
+        currentSignatureType = type;
+        signatureModalTitle.textContent = type === 'dipendente' ? 'Firma del dipendente' : 'Visto F.P.L.';
         signatureModal.classList.remove('hidden');
-        setTimeout(resizeModalCanvas, 50);
+        const firmaText = type === 'dipendente' ? firmaDipendenteText : firmaFunzionarioText;
+        if (firmaText) {
+            if (modeTypeBtn) modeTypeBtn.click();
+            if (signatureTextInput) signatureTextInput.value = firmaText;
+        } else {
+            if (modeDrawBtn) modeDrawBtn.click();
+            if (signaturePad) signaturePad.clear();
+        }
+        if (signatureInputMode === 'draw' && typeof resizeModalCanvas === 'function') { setTimeout(resizeModalCanvas, 50); }
       }
       function closeSignatureModal() { signatureModal.classList.add('hidden'); currentSignatureType = null; }
       async function saveSignature() {
-         if (!signaturePad) { alert("Errore: pannello firma non pronto."); return; }
-         if (signaturePad.isEmpty()) { alert('Per favore, inserisci la firma prima di salvare.'); return; }
-         let optimizingOverlay = document.createElement('div'); 
-         optimizingOverlay.className = 'loading-overlay'; optimizingOverlay.innerHTML = '<div class="loading-message">Ottimizzazione firma...</div>'; document.body.appendChild(optimizingOverlay);
-         try {
-           var dataUrl = signaturePad.toDataURL('image/png');
-           const optimizedDataUrl = await optimizeSignatureImage(dataUrl);
-           if (currentSignatureType === 'dipendente') { firmaDipendenteData = optimizedDataUrl; updateSignatureDisplay('dipendente', optimizedDataUrl); }
-           else { firmaFunzionarioData = optimizedDataUrl; updateSignatureDisplay('funzionario', optimizedDataUrl); }
-           closeSignatureModal();
-         } catch (error) {
-           console.error('Errore durante il salvataggio/ottimizzazione:', error); alert('Errore salvataggio firma: ' + error.message + '\nUso firma non ottimizzata.');
-           try {
-               var fallbackDataUrl = signaturePad.toDataURL('image/png');
-               if (currentSignatureType === 'dipendente') { firmaDipendenteData = fallbackDataUrl; updateSignatureDisplay('dipendente', fallbackDataUrl); }
-               else { firmaFunzionarioData = fallbackDataUrl; updateSignatureDisplay('funzionario', fallbackDataUrl); }
-               closeSignatureModal();
-           } catch (fallbackError) { console.error('Errore fallback firma:', fallbackError); alert('Errore critico salvataggio firma.'); }
-         } finally { if (optimizingOverlay && optimizingOverlay.parentNode) { optimizingOverlay.parentNode.removeChild(optimizingOverlay); } }
-       }
-      function updateSignatureDisplay(type, dataUrl) {
-         var container = type === 'dipendente' ? firmaDipendenteContainer : firmaFunzionarioContainer;
-         var placeholderId = type === 'dipendente' ? 'firma-dipendente-placeholder' : 'firma-funzionario-placeholder';
-         var placeholder = document.getElementById(placeholderId);
-         if (placeholder) { placeholder.style.display = 'none'; }
-         var oldImg = container.querySelector('.signature-image'); if (oldImg) { oldImg.remove(); }
-         var img = document.createElement('img'); img.src = dataUrl; img.alt = type === 'dipendente' ? 'Firma dipendente' : 'Firma funzionario';
-         img.className = 'signature-image'; img.addEventListener('click', function() { openSignatureModal(type); });
-         container.appendChild(img);
-       }
+        if (signatureInputMode === 'draw') {
+            if (signaturePad.isEmpty()) { alert("Per favore, disegna la firma prima di salvare."); return; }
+            let optimizingOverlay = document.createElement('div');
+            optimizingOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.1);z-index:1000;';
+            document.body.appendChild(optimizingOverlay);
+            try {
+                var dataUrl = signaturePad.toDataURL('image/png');
+                const optimizedDataUrl = await optimizeSignatureImage(dataUrl);
+                if (currentSignatureType === 'dipendente') { firmaDipendenteData = optimizedDataUrl; firmaDipendenteText = null; }
+                else { firmaFunzionarioData = optimizedDataUrl; firmaFunzionarioText = null; }
+                updateSignatureDisplay(currentSignatureType, optimizedDataUrl, null);
+                closeSignatureModal();
+            } catch (error) { console.error('Errore:', error); alert('Errore durante il salvataggio della firma.'); }
+            finally { if (optimizingOverlay.parentNode) document.body.removeChild(optimizingOverlay); }
+        } else {
+            const text = signatureTextInput.value.trim();
+            if (text === '') { alert("Per favore, digita il nome prima di salvare."); return; }
+            if (currentSignatureType === 'dipendente') { firmaDipendenteText = text; firmaDipendenteData = null; }
+            else { firmaFunzionarioText = text; firmaFunzionarioData = null; }
+            updateSignatureDisplay(currentSignatureType, null, text);
+            closeSignatureModal();
+        }
+      }
+      function updateSignatureDisplay(type, dataUrl, text) {
+        var container = type === 'dipendente' ? firmaDipendenteContainer : firmaFunzionarioContainer;
+        var placeholder = type === 'dipendente' ? firmaDipendentePlaceholder : firmaFunzionarioPlaceholder;
+        container.innerHTML = '';
+        if (dataUrl) {
+            var img = document.createElement('img');
+            img.src = dataUrl;
+            img.className = 'signature-image';
+            img.addEventListener('click', function() { openSignatureModal(type); });
+            container.appendChild(img);
+        } else if (text) {
+            var textDiv = document.createElement('div');
+            textDiv.className = 'signature-text-display';
+            textDiv.textContent = text;
+            textDiv.addEventListener('click', function() { openSignatureModal(type); });
+            container.appendChild(textDiv);
+        } else { container.appendChild(placeholder); }
+      }
 
       // Event listener per placeholder firme e bottoni modale
       if (firmaDipendentePlaceholder) firmaDipendentePlaceholder.addEventListener('click', function() { openSignatureModal('dipendente'); });
@@ -1430,37 +1461,40 @@
                   const sigMaxH = sigBoxH - 4; // Altezza massima immagine firma
 
                    // Aggiungi firma funzionario (se presente)
-                   if (firmaFunzionarioData) {
+                   if (firmaFunzionarioText) {
+                      pdf.setFont('helvetica', 'normal');
+                      pdf.setFontSize(14);
+                      pdf.setTextColor(0, 0, 0);
+                      pdf.text(firmaFunzionarioText, marginLeft + sigColW / 2, sigStartY + sigMaxH / 2, { align: 'center', baseline: 'middle' });
+                   } else if (firmaFunzionarioData) {
                        try {
                            const iP = pdf.getImageProperties(firmaFunzionarioData);
-                           const ar = iP.width / iP.height; // Aspect ratio
-                           let sW = sigColW*0.8, sH = sW/ar; // Calcola dimensioni mantenendo proporzioni
-                           if(sH > sigMaxH){ sH = sigMaxH; sW = sH * ar; } // Ridimensiona se troppo alta
-                           const sX = marginLeft + (sigColW - sW) / 2; // Centra orizzontalmente
-                           const sY = sigStartY + (sigMaxH - sH) / 2; // Centra verticalmente
+                           const ar = iP.width / iP.height;
+                           let sW = sigColW*0.8, sH = sW/ar;
+                           if(sH > sigMaxH){ sH = sigMaxH; sW = sH * ar; }
+                           const sX = marginLeft + (sigColW - sW) / 2;
+                           const sY = sigStartY + (sigMaxH - sH) / 2;
                            pdf.addImage(firmaFunzionarioData, iP.fileType || 'PNG', sX, sY, sW, sH);
-                       }
-                       catch (e) {
-                           console.error("Errore aggiungendo firma funzionario:", e);
-                           if (pdf) pdf.setFontSize(7).setTextColor(150,0,0).text('Errore Firma Funz.', marginLeft + 5, sigStartY + sigMaxH/2);
-                       }
+                       } catch (e) { console.error("Errore firma funzionario", e); }
                    }
 
                    // Aggiungi firma dipendente (se presente)
-                   if (firmaDipendenteData) {
+                   if (firmaDipendenteText) {
+                      pdf.setFont('helvetica', 'normal');
+                      pdf.setFontSize(14);
+                      pdf.setTextColor(0, 0, 0);
+                      const textX = marginLeft + sigColW + 10 + sigColW / 2;
+                      pdf.text(firmaDipendenteText, textX, sigStartY + sigMaxH / 2, { align: 'center', baseline: 'middle' });
+                   } else if (firmaDipendenteData) {
                        try {
                            const iP = pdf.getImageProperties(firmaDipendenteData);
                            const ar = iP.width / iP.height;
                            let sW = sigColW*0.8, sH = sW/ar;
                            if(sH > sigMaxH){ sH = sigMaxH; sW = sH * ar; }
-                           const sX = marginLeft + sigColW + 10 + (sigColW - sW) / 2; // Centra nel secondo box
+                           const sX = marginLeft + sigColW + 10 + (sigColW - sW) / 2;
                            const sY = sigStartY + (sigMaxH - sH) / 2;
                            pdf.addImage(firmaDipendenteData, iP.fileType || 'PNG', sX, sY, sW, sH);
-                       }
-                       catch (e) {
-                           console.error("Errore aggiungendo firma dipendente:", e);
-                           if (pdf) pdf.setFontSize(7).setTextColor(150,0,0).text('Errore Firma Dip.', marginLeft + sigColW + 15, sigStartY + sigMaxH/2);
-                       }
+                       } catch (e) { console.error("Errore firma dipendente", e); }
                    }
 
                   y = sigY + sigBoxH + 8; // Aggiorna Y sotto le firme
@@ -1468,13 +1502,16 @@
                   // Visto, Dirigente, Footer
                   pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(0,0,0);
 // Centra 'Visto: si concede' rispetto alla larghezza della pagina
-pdf.text('Visto: si concede', pageWidth / 2, y , { align: 'center' });                  pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10);
-                  pdf.text('IL DIRIGENTE', pageWidth / 2, y + 7, { align: 'center' }); // Centrato nella pagina
+pdf.text('Visto: si concede', pageWidth / 2, y , { align: 'center' });                  // IL DIRIGENTE spostato nel footer // Centrato nella pagina
                   y += 15; // Spazio per la firma del dirigente (non nel box)
 
-                  // Footer pagina
-                  pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(100, 100, 100);
-                  pdf.text('Modulo Richiesta Ferie - Polizia Roma Capitale - Pagina 1 di 1', pageWidth / 2, pageHeight - 10, { align: 'center' });
+                  // Footer pagina con diciture personalizzate
+                  const footerY = pageHeight - 15;
+                  pdf.setFont('helvetica', 'bold');
+                  pdf.setFontSize(10);
+                  pdf.setTextColor(0, 0, 0);
+                  pdf.text('IL COORDINATORE DI SEZIONI F.P.L.', marginLeft, footerY, { align: 'left' });
+                  pdf.text('IL DIRIGENTE', pageWidth - marginRight, footerY, { align: 'right' });
                   // Linea blu in fondo
                   pdf.setFillColor(colorBlue[0], colorBlue[1], colorBlue[2]);
                   pdf.rect(0, pageHeight - 5, pageWidth, 5, 'F');
